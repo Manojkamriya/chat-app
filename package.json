@@ -1,0 +1,16 @@
+{
+  "name": "chat-app",
+  "version": "1.0.0",
+  "scripts": {
+    "vercel-build": "cd front-end && npm install && npm run build",
+    "build": "cd front-end && npm run build",
+    "backend": "nodemon index.js",
+    "dev": "cd front-end && npm run dev"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
