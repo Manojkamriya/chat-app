@@ -211,7 +211,21 @@ html, body, #root {
     flex-direction: column;
     background-color: #efeae2;
 }
-
+.no_chat_selected{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    margin-block: auto;
+}
+.no_messages{
+    display: flex;
+    margin: 30%;
+}
+.no_chats{
+margin: 10% 10%;
+}
 .chat_header {
     background-color: #f0f2f5;
     padding: 10px 20px;
