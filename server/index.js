@@ -10,30 +10,29 @@ const socketHandler = require('./socket');
 
 const app = express();
 
-// -------------------- CORS Setup --------------------
+
 const allowedOrigins = [
-  'http://localhost:5000', 'http://localhost:5001',
-  'http://127.0.0.1:5000',
-  'http://192.168.29.6:5000', // LAN testing
+  process.env.FRONTEND_URL,
+  process.env.LOCAL_URL
 ];
 
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true, // allow cookies if using them
+  credentials: true,
 }));
 
-// -------------------- Middleware --------------------
+
 app.use(express.json());
 
-// -------------------- Routes --------------------
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 
-// -------------------- HTTP Server --------------------
+
 const server = http.createServer(app);
 
-// -------------------- Socket.IO --------------------
+
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
@@ -45,8 +44,9 @@ const io = new Server(server, {
 
 socketHandler(io);
 
-// -------------------- Start Server --------------------
-const PORT =  3002;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Backend running on http://0.0.0.0:${PORT}`);
+
+// Use the PORT Render provides
+const PORT = process.env.PORT;
+server.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
 });
