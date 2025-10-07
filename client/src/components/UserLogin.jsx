@@ -58,7 +58,8 @@ if (data.user) {
   };
 
   return (
-    <div className='login_container'>
+    <div className='login-container-wrapper'>
+<div className='login_container'>
       <div className='login_title'>
         <FaReact className='login_icon' />
         <h1>Chat App</h1>
@@ -95,6 +96,8 @@ if (data.user) {
         </p>
       </div>
     </div>
+    </div>
+    
   );
 };
 
