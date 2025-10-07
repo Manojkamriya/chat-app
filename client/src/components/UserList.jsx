@@ -37,6 +37,7 @@ const UserList = ({ users, chatUsers, onSelectUser, selectedUser, currentUser })
                 <div className="user_info">
                   <div className="user_header">
                     <h4>{u.username}</h4>
+                    <h6>{u.email}</h6>
                     <span className={`status ${u.online ? "online" : "offline"}`}></span>
                   </div>
                   <p className="last_message">{u.lastMessage || ""}</p>
