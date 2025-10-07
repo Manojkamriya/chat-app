@@ -9,6 +9,10 @@ export default defineConfig({
     port: 5000,
     allowedHosts: true,
     proxy: {
+      '/api': {
+        target: 'http://localhost:3002',
+        changeOrigin: true
+      },
       '/socket.io': {
         target: 'http://localhost:3002',
         ws: true,
