@@ -375,4 +375,7 @@ html, body, #root {
     .userlist_container, .chats_list {
         max-height: 100%;
     }
+     .chat_section.focused {
+    height: 50%; 
+  }
 }
