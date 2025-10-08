@@ -328,19 +328,20 @@ margin: 10% 10%;
     padding: 8px 12px;
     max-width: 70%;
     margin: 5px 0;
-    border-radius: 10px 0px 10px 10px; /* top-right flat, others rounded */
+    border-radius: 10px 0px 10px 10px; 
     position: relative;
 }
 
 .sender_bubble::after {
-    content: '';
-    position: absolute;
-    right: -2px;
-    top: 0;
-    width: 0;
-    height: 0;
-    border-top: 4px solid #dcf8c6;
-    border-left: 13px solid transparent;
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 0px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid #d9fdd3;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid transparent;
 }
 
 .receiver_bubble {
@@ -354,15 +355,18 @@ margin: 10% 10%;
 }
 
 .receiver_bubble::after {
-    content: '';
-    position: absolute;
-    left: -2px;
-    top: 0;
-    width: 0;
-    height: 0;
-    border-top: 4px solid #fff;
-    border-right: 13px solid transparent;
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-top: 8px solid #fff;
+  border-left: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  transform: rotate(0deg);
 }
+
 
 
 .message_text {
@@ -470,4 +474,24 @@ margin: 10% 10%;
      .chat_section.focused {
     height: 50%; 
   }
+}
+.emoji_picker {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #f0f0f0;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 10;
+}
+
+.emoji {
+  font-size: 20px;
+  cursor: pointer;
+}
+.reaction {
+  margin-left: 6px;
+  font-size: 18px;
 }

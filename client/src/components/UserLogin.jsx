@@ -43,9 +43,10 @@ const UserLogin = ({ setUser }) => {
 if (data.user) {
   const userWithToken = {
     ...data.user,
-    access_token: data.user.access_token // store token
+    access_token: data.user.access_token,  refresh_token: data.user.refresh_token, 
   };
   localStorage.setItem('access_token', userWithToken.access_token);
+   localStorage.setItem('refresh_token', userWithToken.refresh_token);
   localStorage.setItem('user', JSON.stringify(userWithToken));
   setUser(userWithToken);
 }

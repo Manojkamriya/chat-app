@@ -162,7 +162,8 @@ router.post('/signup', async (req, res) => {
 
     const response = {
       ...profile,
-      access_token: loginData.session.access_token
+      access_token: loginData.session.access_token,
+      refresh_token: loginData.session.refresh_token
     };
 
     res.status(201).json({ message: 'Signup successful', user: response });
@@ -229,7 +230,7 @@ router.post('/login', async (req, res) => {
 
     res.status(200).json({
       message: 'Login successful',
-      user: { ...profile.data, access_token: data.session.access_token }
+      user: { ...profile.data, access_token: data.session.access_token,refresh_token: data.session.refresh_token }
     });
   } catch (err) {
     console.error(err);
@@ -265,39 +266,35 @@ router.post('/refresh-token', async (req, res) => {
   }
 });
 
-// ---------------- LOGOUT ----------------
 router.post('/logout', async (req, res) => {
-  const { user_id } = req.body;
-  if (!user_id) return res.status(400).json({ error: 'User ID required' });
+  const { access_token, user_id } = req.body;
+
+  if (!access_token || !user_id) {
+    return res.status(400).json({ error: 'access_token and user_id required' });
+  }
 
   try {
-    // Call Supabase Admin REST API to invalidate sessions
-    const projectRef = process.env.SUPABASE_PROJECT_REF; // e.g., 'xyzabc123'
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // Create a temporary client using the user's token
+    const userSupabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${access_token}` } },
+    });
 
-    await axios.post(
-      `https://${projectRef}.supabase.co/auth/v1/admin/users/${user_id}/invalidate`,
-      {},
-      {
-        headers: {
-          apiKey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    // Sign out the user (this revokes their refresh token)
+    const { error } = await userSupabase.auth.signOut();
+    if (error) throw error;
 
-    // Update user's online status
+    // Update user's status in your 'profiles' table
     await supabase
       .from('profiles')
       .update({ online: false, last_seen: new Date() })
       .eq('id', user_id);
 
-    res.status(200).json({ message: 'Logged out successfully' });
+    res.json({ message: 'Logged out successfully' });
   } catch (err) {
-    console.error('Logout error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Logout error:', err.message);
+    res.status(500).json({ error: 'Failed to log out' });
   }
 });
+
 
 module.exports = router;
