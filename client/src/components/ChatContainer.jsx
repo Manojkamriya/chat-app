@@ -101,6 +101,16 @@ useEffect(() => {
       );
     });
 
+    socket.on("reactionUpdated", ({ messageId, reactions }) => {
+      setChats((prev) =>
+        prev.map((chat) =>
+          (chat.id === messageId || chat.timestamp === messageId)
+            ? { ...chat, reactions }
+            : chat
+        )
+      );
+    });
+
     return () => {
       socket.off("usersList");
       socket.off("chatUsersList");
@@ -108,6 +118,7 @@ useEffect(() => {
       socket.off("receiveMessage");
       socket.off("userOnline");
       socket.off("userOffline");
+      socket.off("reactionUpdated");
     };
   }, [user]);
 
@@ -134,6 +145,30 @@ useEffect(() => {
     };
 
     socketRef.current.emit("privateMessage", newMessage);
+  };
+
+  // ---------------- REACTIONS ----------------
+  const handleAddReaction = (chat, emoji) => {
+    if (!socketRef.current || !chat.id) return;
+    const senderId = chat.sender_id || chat.sender;
+    const receiverId = chat.receiver_id || chat.receiver;
+    const otherUserId = senderId === user.id ? receiverId : senderId;
+    socketRef.current.emit("addReaction", {
+      messageId: chat.id,
+      emoji,
+      receiverId: otherUserId,
+    });
+  };
+
+  const handleRemoveReaction = (chat) => {
+    if (!socketRef.current || !chat.id) return;
+    const senderId = chat.sender_id || chat.sender;
+    const receiverId = chat.receiver_id || chat.receiver;
+    const otherUserId = senderId === user.id ? receiverId : senderId;
+    socketRef.current.emit("removeReaction", {
+      messageId: chat.id,
+      receiverId: otherUserId,
+    });
   };
 
   // ---------------- LOGOUT ----------------
@@ -199,7 +234,12 @@ useEffect(() => {
                   </div>
                 </div>
 
-                <ChatLists chats={chats} currentUser={user.id} />
+                <ChatLists 
+                  chats={chats} 
+                  currentUser={user.id}
+                  onAddReaction={handleAddReaction}
+                  onRemoveReaction={handleRemoveReaction}
+                />
                 <InputText addMessage={addMessage} />
               </>
             ) : (

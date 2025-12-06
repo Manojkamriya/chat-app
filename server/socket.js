@@ -86,11 +86,16 @@ module.exports = (io) => {
           .single();
 
         const messageData = {
+          id: savedMessage.id,
           sender: socket.user.id,
           receiver: msg.receiverId,
+          sender_id: savedMessage.sender_id,
+          receiver_id: savedMessage.receiver_id,
           message: savedMessage.message,
           senderAvatar: savedMessage.sender_avatar,
+          sender_avatar: savedMessage.sender_avatar,
           timestamp: savedMessage.timestamp,
+          reactions: savedMessage.reactions || {},
         };
 
         if (receiver?.socket_id) io.to(receiver.socket_id).emit('receiveMessage', messageData);
@@ -136,6 +141,80 @@ module.exports = (io) => {
         socket.emit('chatUsersList', usersWithChat);
       } catch (err) {
         console.error(err);
+      }
+    });
+
+    // ------------------- ADD REACTION -------------------
+    socket.on('addReaction', async ({ messageId, emoji, receiverId }) => {
+      try {
+        const { data: message } = await supabase
+          .from('chats')
+          .select('reactions')
+          .eq('id', messageId)
+          .single();
+
+        const reactions = message?.reactions || {};
+        reactions[socket.user.id] = emoji;
+
+        const { error } = await supabase
+          .from('chats')
+          .update({ reactions })
+          .eq('id', messageId);
+
+        if (error) throw error;
+
+        const reactionData = { messageId, reactions };
+        
+        socket.emit('reactionUpdated', reactionData);
+        
+        const { data: receiver } = await supabase
+          .from('profiles')
+          .select('socket_id')
+          .eq('id', receiverId)
+          .single();
+        
+        if (receiver?.socket_id) {
+          io.to(receiver.socket_id).emit('reactionUpdated', reactionData);
+        }
+      } catch (err) {
+        console.error('Error adding reaction:', err);
+      }
+    });
+
+    // ------------------- REMOVE REACTION -------------------
+    socket.on('removeReaction', async ({ messageId, receiverId }) => {
+      try {
+        const { data: message } = await supabase
+          .from('chats')
+          .select('reactions')
+          .eq('id', messageId)
+          .single();
+
+        const reactions = message?.reactions || {};
+        delete reactions[socket.user.id];
+
+        const { error } = await supabase
+          .from('chats')
+          .update({ reactions })
+          .eq('id', messageId);
+
+        if (error) throw error;
+
+        const reactionData = { messageId, reactions };
+        
+        socket.emit('reactionUpdated', reactionData);
+        
+        const { data: receiver } = await supabase
+          .from('profiles')
+          .select('socket_id')
+          .eq('id', receiverId)
+          .single();
+        
+        if (receiver?.socket_id) {
+          io.to(receiver.socket_id).emit('reactionUpdated', reactionData);
+        }
+      } catch (err) {
+        console.error('Error removing reaction:', err);
       }
     });
 

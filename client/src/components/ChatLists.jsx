@@ -5,9 +5,8 @@ const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +5:30 hours
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '👏'];
 const LONG_PRESS_DURATION = 600; // ms
 
-const ChatLists = ({ chats = [], currentUser }) => {
+const ChatLists = ({ chats = [], currentUser, onAddReaction, onRemoveReaction }) => {
   const endOfMessagesRef = useRef(null);
-  const [reactions, setReactions] = useState({});
   const [emojiPicker, setEmojiPicker] = useState(null);
 
   useEffect(() => scrollToBottom(), [chats]);
@@ -58,49 +57,51 @@ const ChatLists = ({ chats = [], currentUser }) => {
   const grouped = groupChatsByDate(chats);
   const sortedDateKeys = Object.keys(grouped).sort((a, b) => (a < b ? -1 : 1));
 
-  const handleLongPress = (chatId, event) => {
+  const handleLongPress = (chat, event) => {
     const rect = event.currentTarget ? event.currentTarget.getBoundingClientRect() : { left: 0, width: 0, top: 0 };
     const x = event.clientX || rect.left + rect.width / 2;
     const y = event.clientY ? event.clientY - 60 : rect.top - 50;
     
-    // Get emoji picker approximate width (6 emojis * ~36px each + padding)
     const pickerWidth = 240;
     const screenWidth = window.innerWidth;
-    const screenPadding = 10; // Minimum padding from screen edge
+    const screenPadding = 10;
     
-    // Calculate adjusted X position to keep picker in bounds
     let adjustedX = x;
     
-    // Check if picker would go off the left edge
     if (x - pickerWidth / 2 < screenPadding) {
       adjustedX = pickerWidth / 2 + screenPadding;
     }
     
-    // Check if picker would go off the right edge
     if (x + pickerWidth / 2 > screenWidth - screenPadding) {
       adjustedX = screenWidth - pickerWidth / 2 - screenPadding;
     }
     
     setEmojiPicker({
-      chatId,
+      chat,
       x: adjustedX,
       y,
     });
   };
 
-  const handleEmojiSelect = (chatId, emoji) => {
-    setReactions(prev => ({ ...prev, [chatId]: emoji }));
+  const handleEmojiSelect = (chat, emoji) => {
+    const existingReaction = chat.reactions?.[currentUser];
+    if (existingReaction === emoji) {
+      onRemoveReaction?.(chat);
+    } else {
+      onAddReaction?.(chat, emoji);
+    }
     setEmojiPicker(null);
   };
 
   const ChatBubble = ({ chat }) => {
     const isSender = (chat.sender_id || chat.sender) === currentUser;
-    const reaction = reactions[chat.id];
+    const reactions = chat.reactions || {};
+    const reactionEntries = Object.entries(reactions);
     const pressTimerRef = useRef(null);
 
     const startPress = (e) => {
       e.preventDefault();
-      pressTimerRef.current = setTimeout(() => handleLongPress(chat.id, e), LONG_PRESS_DURATION);
+      pressTimerRef.current = setTimeout(() => handleLongPress(chat, e), LONG_PRESS_DURATION);
     };
 
     const endPress = () => {
@@ -114,7 +115,7 @@ const ChatLists = ({ chats = [], currentUser }) => {
       e.preventDefault();
       const touch = e.touches[0];
       pressTimerRef.current = setTimeout(() => {
-        handleLongPress(chat.id, {
+        handleLongPress(chat, {
           clientX: touch.clientX,
           clientY: touch.clientY,
           currentTarget: e.currentTarget,
@@ -137,7 +138,11 @@ const ChatLists = ({ chats = [], currentUser }) => {
         <div className={`chat_bubble ${isSender ? 'sender_bubble' : 'receiver_bubble'}`}>
           <p className="message_text">{chat.message}</p>
           <span className="message_time">{formatTimeIST(chat.timestamp)}</span>
-          {reaction && <span className={`reaction ${isSender ? 'sender' : 'receiver'}`}>{reaction}</span>}
+          {reactionEntries.length > 0 && (
+            <span className={`reaction ${isSender ? 'sender' : 'receiver'}`}>
+              {reactionEntries.map(([userId, emoji]) => emoji).join('')}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -178,7 +183,7 @@ const ChatLists = ({ chats = [], currentUser }) => {
               <span
                 key={idx}
                 className="emoji"
-                onClick={() => handleEmojiSelect(emojiPicker.chatId, emoji)}
+                onClick={() => handleEmojiSelect(emojiPicker.chat, emoji)}
               >
                 {emoji}
               </span>
