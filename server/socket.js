@@ -2,6 +2,55 @@
 const supabase = require('./supabase');
 
 module.exports = (io) => {
+  // ------------------- HEARTBEAT TRACKING -------------------
+  const HEARTBEAT_TIMEOUT = 60000; // 60 seconds - mark offline if no heartbeat
+  
+  // Check for stale connections every 30 seconds
+  const heartbeatChecker = setInterval(async () => {
+    try {
+      const { data: staleUsers, error } = await supabase
+        .from('profiles')
+        .select('id, socket_id')
+        .eq('online', true)
+        .lt('last_seen', new Date(Date.now() - HEARTBEAT_TIMEOUT).toISOString());
+
+      if (error) {
+        console.error('Error checking heartbeat:', error);
+        return;
+      }
+
+      if (staleUsers && staleUsers.length > 0) {
+        for (const user of staleUsers) {
+          console.log(`Marking user ${user.id} as offline (no heartbeat)`);
+          
+          // Update last_seen to now to prevent re-processing, set offline
+          await supabase
+            .from('profiles')
+            .update({ online: false, socket_id: null, last_seen: new Date() })
+            .eq('id', user.id);
+
+          // Disconnect the stale socket if it exists
+          if (user.socket_id) {
+            const staleSocket = io.sockets.sockets.get(user.socket_id);
+            if (staleSocket) {
+              staleSocket.disconnect(true);
+            }
+          }
+
+          // Broadcast offline status to all connected clients
+          io.emit('userOffline', { userId: user.id, online: false });
+        }
+      }
+    } catch (err) {
+      console.error('Heartbeat checker error:', err);
+    }
+  }, 30000);
+
+  // Clean up interval when io closes (for graceful shutdown)
+  io.on('close', () => {
+    clearInterval(heartbeatChecker);
+  });
+
   // ------------------- AUTHENTICATE SOCKET -------------------
   io.use(async (socket, next) => {
     try {
@@ -260,6 +309,18 @@ module.exports = (io) => {
         }
       } catch (err) {
         console.error('Error marking messages as read:', err);
+      }
+    });
+
+    // ------------------- HEARTBEAT -------------------
+    socket.on('heartbeat', async () => {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ last_seen: new Date(), online: true })
+          .eq('id', socket.user.id);
+      } catch (err) {
+        console.error('Heartbeat update error:', err);
       }
     });
 

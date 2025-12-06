@@ -14,6 +14,7 @@ const ChatContainer = () => {
 
   const socketRef = useRef(null);
   const isConnectedRef = useRef(false);
+  const heartbeatIntervalRef = useRef(null);
 
   const [chats, setChats] = useState([]);
   const [users, setUsers] = useState([]);
@@ -141,6 +142,21 @@ useEffect(() => {
 
     socket.emit("deliverPendingMessages");
 
+    // Clear any existing heartbeat interval before creating new one
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+    }
+
+    // Heartbeat mechanism - send ping every 30 seconds to maintain online status
+    heartbeatIntervalRef.current = setInterval(() => {
+      if (socketRef.current) {
+        socketRef.current.emit("heartbeat");
+      }
+    }, 30000);
+
+    // Send initial heartbeat
+    socket.emit("heartbeat");
+
     return () => {
       socket.off("usersList");
       socket.off("chatUsersList");
@@ -151,6 +167,10 @@ useEffect(() => {
       socket.off("reactionUpdated");
       socket.off("messagesRead");
       socket.off("messagesDelivered");
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
     };
   }, [user]);
 
