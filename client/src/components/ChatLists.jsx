@@ -1,9 +1,32 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './EmojiPicker.css'; 
+import './MessageStatus.css';
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +5:30 hours
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '👏'];
 const LONG_PRESS_DURATION = 600; // ms
+
+const MessageStatus = ({ status, isSender }) => {
+  if (!isSender) return null;
+  
+  return (
+    <span className={`message_status ${status || 'sent'}`}>
+      {status === 'read' ? (
+        <svg viewBox="0 0 16 11" width="16" height="11">
+          <path fill="currentColor" d="M11.07 0.15L5.43 5.89L3.93 4.39L1.03 7.29L5.43 11.69L13.97 3.05L11.07 0.15ZM11.07 0.15L14.97 4.05L12.07 6.95" />
+        </svg>
+      ) : status === 'delivered' ? (
+        <svg viewBox="0 0 16 11" width="16" height="11">
+          <path fill="currentColor" d="M11.07 0.15L5.43 5.89L3.93 4.39L1.03 7.29L5.43 11.69L13.97 3.05L11.07 0.15ZM11.07 0.15L14.97 4.05L12.07 6.95" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 12 11" width="12" height="11">
+          <path fill="currentColor" d="M9.07 0.15L3.43 5.89L1.93 4.39L0.03 6.29L3.43 9.69L10.97 2.05L9.07 0.15Z" />
+        </svg>
+      )}
+    </span>
+  );
+};
 
 const ChatLists = ({ chats = [], currentUser, onAddReaction, onRemoveReaction }) => {
   const endOfMessagesRef = useRef(null);
@@ -137,7 +160,10 @@ const ChatLists = ({ chats = [], currentUser, onAddReaction, onRemoveReaction })
       >
         <div className={`chat_bubble ${isSender ? 'sender_bubble' : 'receiver_bubble'}`}>
           <p className="message_text">{chat.message}</p>
-          <span className="message_time">{formatTimeIST(chat.timestamp)}</span>
+          <div className="message_footer">
+            <span className="message_time">{formatTimeIST(chat.timestamp)}</span>
+            <MessageStatus status={chat.status} isSender={isSender} />
+          </div>
           {reactionEntries.length > 0 && (
             <span className={`reaction ${isSender ? 'sender' : 'receiver'}`}>
               {reactionEntries.map(([userId, emoji]) => emoji).join('')}

@@ -74,13 +74,17 @@ useEffect(() => {
 
     socket.on("receiveMessage", (msg) => {
       const selected = selectedUserRef.current;
-      if (!selected) return;
-
-      if (
-        (msg.sender === selected.id && msg.receiver === user.id) ||
-        (msg.sender === user.id && msg.receiver === selected.id)
-      ) {
-        setChats((prev) => [...prev, msg]);
+      
+      if (selected) {
+        if (
+          (msg.sender === selected.id && msg.receiver === user.id) ||
+          (msg.sender === user.id && msg.receiver === selected.id)
+        ) {
+          setChats((prev) => [...prev, msg]);
+          if (msg.sender === selected.id && msg.receiver === user.id) {
+            socket.emit("markAsRead", { senderId: selected.id });
+          }
+        }
       }
       socket.emit("getChatUsers");
     });
@@ -111,6 +115,32 @@ useEffect(() => {
       );
     });
 
+    socket.on("messagesRead", ({ messageIds }) => {
+      if (messageIds && messageIds.length > 0) {
+        setChats((prev) =>
+          prev.map((chat) =>
+            messageIds.includes(chat.id)
+              ? { ...chat, status: 'read' }
+              : chat
+          )
+        );
+      }
+    });
+
+    socket.on("messagesDelivered", ({ messageIds }) => {
+      if (messageIds && messageIds.length > 0) {
+        setChats((prev) =>
+          prev.map((chat) =>
+            messageIds.includes(chat.id)
+              ? { ...chat, status: 'delivered' }
+              : chat
+          )
+        );
+      }
+    });
+
+    socket.emit("deliverPendingMessages");
+
     return () => {
       socket.off("usersList");
       socket.off("chatUsersList");
@@ -119,6 +149,8 @@ useEffect(() => {
       socket.off("userOnline");
       socket.off("userOffline");
       socket.off("reactionUpdated");
+      socket.off("messagesRead");
+      socket.off("messagesDelivered");
     };
   }, [user]);
 
@@ -131,6 +163,7 @@ useEffect(() => {
 
     if (socketRef.current) {
       socketRef.current.emit("loadMessages", { selectedUserId: userObj.id });
+      socketRef.current.emit("markAsRead", { senderId: userObj.id });
     }
   };
 

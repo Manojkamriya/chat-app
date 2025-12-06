@@ -66,24 +66,29 @@ module.exports = (io) => {
     // ------------------- SEND MESSAGE -------------------
     socket.on('privateMessage', async (msg) => {
       try {
+        // Check if receiver is online
+        const { data: receiver } = await supabase
+          .from('profiles')
+          .select('socket_id, online')
+          .eq('id', msg.receiverId)
+          .single();
+
+        // Set initial status: 'delivered' if receiver online, otherwise 'sent'
+        const initialStatus = receiver?.online && receiver?.socket_id ? 'delivered' : 'sent';
+
         const { data: savedMessage, error } = await supabase
           .from('chats')
           .insert([{
             sender_id: socket.user.id,
             receiver_id: msg.receiverId,
             message: msg.message,
-            sender_avatar: msg.senderAvatar
+            sender_avatar: msg.senderAvatar,
+            status: initialStatus
           }])
           .select()
           .single();
 
         if (error) throw error;
-
-        const { data: receiver } = await supabase
-          .from('profiles')
-          .select('socket_id')
-          .eq('id', msg.receiverId)
-          .single();
 
         const messageData = {
           id: savedMessage.id,
@@ -96,6 +101,7 @@ module.exports = (io) => {
           sender_avatar: savedMessage.sender_avatar,
           timestamp: savedMessage.timestamp,
           reactions: savedMessage.reactions || {},
+          status: savedMessage.status || 'sent',
         };
 
         if (receiver?.socket_id) io.to(receiver.socket_id).emit('receiveMessage', messageData);
@@ -215,6 +221,83 @@ module.exports = (io) => {
         }
       } catch (err) {
         console.error('Error removing reaction:', err);
+      }
+    });
+
+    // ------------------- MARK MESSAGES AS READ -------------------
+    socket.on('markAsRead', async ({ senderId }) => {
+      try {
+        // Update all unread messages from sender to current user as 'read'
+        const { data: updatedMessages, error } = await supabase
+          .from('chats')
+          .update({ status: 'read' })
+          .eq('sender_id', senderId)
+          .eq('receiver_id', socket.user.id)
+          .neq('status', 'read')
+          .select('id');
+
+        if (error) throw error;
+
+        if (updatedMessages && updatedMessages.length > 0) {
+          // Notify the sender that their messages were read
+          const { data: sender } = await supabase
+            .from('profiles')
+            .select('socket_id')
+            .eq('id', senderId)
+            .single();
+
+          const messageIds = updatedMessages.map(m => m.id);
+          
+          if (sender?.socket_id) {
+            io.to(sender.socket_id).emit('messagesRead', { 
+              messageIds, 
+              readBy: socket.user.id 
+            });
+          }
+          
+          // Also emit to current user for UI update
+          socket.emit('messagesRead', { messageIds, readBy: socket.user.id });
+        }
+      } catch (err) {
+        console.error('Error marking messages as read:', err);
+      }
+    });
+
+    // ------------------- DELIVER PENDING MESSAGES ON CONNECT -------------------
+    socket.on('deliverPendingMessages', async () => {
+      try {
+        // Find all 'sent' messages where current user is receiver
+        const { data: pendingMessages, error } = await supabase
+          .from('chats')
+          .update({ status: 'delivered' })
+          .eq('receiver_id', socket.user.id)
+          .eq('status', 'sent')
+          .select('id, sender_id');
+
+        if (error) throw error;
+
+        if (pendingMessages && pendingMessages.length > 0) {
+          // Group by sender and notify them
+          const senderGroups = {};
+          pendingMessages.forEach(msg => {
+            if (!senderGroups[msg.sender_id]) senderGroups[msg.sender_id] = [];
+            senderGroups[msg.sender_id].push(msg.id);
+          });
+
+          for (const [senderId, messageIds] of Object.entries(senderGroups)) {
+            const { data: sender } = await supabase
+              .from('profiles')
+              .select('socket_id')
+              .eq('id', senderId)
+              .single();
+
+            if (sender?.socket_id) {
+              io.to(sender.socket_id).emit('messagesDelivered', { messageIds });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error delivering pending messages:', err);
       }
     });
 

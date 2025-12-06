@@ -1,0 +1,28 @@
+.message_footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.message_status {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.message_status svg {
+  vertical-align: middle;
+}
+
+.message_status.sent {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.message_status.delivered {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.message_status.read {
+  color: #53bdeb;
+}
