@@ -142,6 +142,22 @@ useEffect(() => {
 
     socket.emit("deliverPendingMessages");
 
+    // Handle reconnection - ensure pending messages are delivered on reconnect
+    socket.on("connect", () => {
+      console.log("Socket connected/reconnected");
+      socket.emit("deliverPendingMessages");
+      socket.emit("heartbeat");
+      socket.emit("getUsers");
+      socket.emit("getChatUsers");
+      
+      // Reload messages for selected user if any
+      const selected = selectedUserRef.current;
+      if (selected) {
+        socket.emit("loadMessages", { selectedUserId: selected.id });
+        socket.emit("markAsRead", { senderId: selected.id });
+      }
+    });
+
     // Clear any existing heartbeat interval before creating new one
     if (heartbeatIntervalRef.current) {
       clearInterval(heartbeatIntervalRef.current);
@@ -167,6 +183,7 @@ useEffect(() => {
       socket.off("reactionUpdated");
       socket.off("messagesRead");
       socket.off("messagesDelivered");
+      socket.off("connect");
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
         heartbeatIntervalRef.current = null;
