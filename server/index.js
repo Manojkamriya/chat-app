@@ -11,16 +11,8 @@ const socketHandler = require('./socket');
 const app = express();
 
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.LOCAL_URL,
-  `https://${process.env.REPLIT_DEV_DOMAIN}`,
-  'http://localhost:5000',
-  'http://0.0.0.0:5000'
-];
-
 app.use(cors({
-  origin: allowedOrigins,
+  origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
 }));
@@ -38,7 +30,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: true,
     methods: ['GET', 'POST'],
     credentials: true,
   },
