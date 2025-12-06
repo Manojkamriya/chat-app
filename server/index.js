@@ -13,7 +13,10 @@ const app = express();
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  process.env.LOCAL_URL
+  process.env.LOCAL_URL,
+  `https://${process.env.REPLIT_DEV_DOMAIN}`,
+  'http://localhost:5000',
+  'http://0.0.0.0:5000'
 ];
 
 app.use(cors({
@@ -45,8 +48,7 @@ const io = new Server(server, {
 socketHandler(io);
 
 
-// Use the PORT Render provides
-const PORT = process.env.PORT;
-server.listen(PORT, () => {
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, 'localhost', () => {
   console.log(`Backend running on port ${PORT}`);
 });

@@ -4,7 +4,7 @@
   "scripts": {
     "vercel-build": "cd client && npm install && npm run build",
     "build": "cd client && npm run build",
-    "backend": "cd server && nodemon index.js",
+    "backend": "cd server && node index.js",
     "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run backend\" \"npm run client\""
   },
