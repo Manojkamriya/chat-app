@@ -9,7 +9,7 @@ channel = "stable-25_05"
 
 [userenv.development]
 PORT = "3001"
-VITE_API_URL = "http://localhost:3001"
+VITE_API_URL = "https://1f3ab760-b5f6-403b-9557-86619760a7cd-00-35988lvdxur7b.janeway.replit.dev:3001"
 
 [workflows]
 runButton = "Project"
@@ -46,3 +46,7 @@ externalPort = 80
 [[ports]]
 localPort = 33251
 externalPort = 3000
+
+[[ports]]
+localPort = 37173
+externalPort = 3002

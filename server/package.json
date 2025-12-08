@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@msgpack/msgpack": "^3.1.2",
     "@supabase/supabase-js": "^2.74.0",
     "axios": "^1.12.2",
     "cors": "^2.8.5",
