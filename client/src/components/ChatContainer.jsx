@@ -310,7 +310,7 @@ const ChatContainer = () => {
       reactions: {}
     };
 
-    setChats(prev => [...prev, optimisticMessage]);
+    // setChats(prev => [...prev, optimisticMessage]);
     
     const newMessage = {
       tempId,

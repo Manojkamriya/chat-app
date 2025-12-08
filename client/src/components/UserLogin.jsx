@@ -63,7 +63,7 @@ if (data.user) {
 <div className='login_container'>
       <div className='login_title'>
         <FaReact className='login_icon' />
-        <h1>Chat App</h1>
+        <h1>NovaTalk</h1>
       </div>
 
       <div className='login_form'>
