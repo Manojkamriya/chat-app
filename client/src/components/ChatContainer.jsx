@@ -20,21 +20,24 @@ const ChatContainer = () => {
   const [users, setUsers] = useState([]);
   const [chatUsers, setChatUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [mobileView, setMobileView] = useState(false); // mobile toggle
+  const [mobileView, setMobileView] = useState(false);
+  const [pendingMessages, setPendingMessages] = useState([]);
+  const [unreadCounts, setUnreadCounts] = useState({});
   const selectedUserRef = useRef(null);
-useEffect(() => {
-  const setHeight = () => {
-    const chatLayout = document.querySelector('.chat_layout');
-    if (chatLayout) chatLayout.style.height = `${window.innerHeight}px`;
-  };
+  const messageIdCounter = useRef(0);
 
-  setHeight();
-  window.addEventListener('resize', setHeight);
+  useEffect(() => {
+    const setHeight = () => {
+      const chatLayout = document.querySelector('.chat_layout');
+      if (chatLayout) chatLayout.style.height = `${window.innerHeight}px`;
+    };
 
-  return () => window.removeEventListener('resize', setHeight);
-}, []);
+    setHeight();
+    window.addEventListener('resize', setHeight);
 
-  // ---------------- FETCH USERS ----------------
+    return () => window.removeEventListener('resize', setHeight);
+  }, []);
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -48,7 +51,6 @@ useEffect(() => {
     fetchUsers();
   }, []);
 
-  // ---------------- SOCKET CONNECTION ----------------
   useEffect(() => {
     if (!user) return;
 
@@ -65,9 +67,19 @@ useEffect(() => {
 
     socket.emit("getUsers");
     socket.emit("getChatUsers");
+    socket.emit("getUnreadCounts");
 
     socket.on("usersList", setUsers);
-    socket.on("chatUsersList", setChatUsers);
+    socket.on("chatUsersList", (users) => {
+      setChatUsers(users);
+      const counts = {};
+      users.forEach(u => {
+        if (u.unreadCount > 0) {
+          counts[u.id] = u.unreadCount;
+        }
+      });
+      setUnreadCounts(prev => ({ ...prev, ...counts }));
+    });
 
     socket.on("chatHistory", (messages) => {
       setChats(messages || []);
@@ -81,13 +93,56 @@ useEffect(() => {
           (msg.sender === selected.id && msg.receiver === user.id) ||
           (msg.sender === user.id && msg.receiver === selected.id)
         ) {
-          setChats((prev) => [...prev, msg]);
+          setChats((prev) => {
+            const exists = prev.some(c => c.id === msg.id);
+            if (exists) return prev;
+            return [...prev, msg];
+          });
           if (msg.sender === selected.id && msg.receiver === user.id) {
             socket.emit("markAsRead", { senderId: selected.id });
           }
         }
       }
+      
+      if (msg.sender !== user.id && msg.sender !== selected?.id) {
+        setUnreadCounts(prev => ({
+          ...prev,
+          [msg.sender]: (prev[msg.sender] || 0) + 1
+        }));
+      }
+      
       socket.emit("getChatUsers");
+    });
+
+    socket.on("receiveQueuedMessage", (msg) => {
+      const selected = selectedUserRef.current;
+      
+      if (selected && msg.sender === selected.id) {
+        setChats((prev) => {
+          const exists = prev.some(c => c.id === msg.id);
+          if (exists) return prev;
+          return [...prev, msg].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        });
+        socket.emit("markAsRead", { senderId: selected.id });
+      } else {
+        setUnreadCounts(prev => ({
+          ...prev,
+          [msg.sender]: (prev[msg.sender] || 0) + 1
+        }));
+      }
+      
+      socket.emit("getChatUsers");
+    });
+
+    socket.on("messageSent", ({ messageId, status, tempId }) => {
+      setPendingMessages(prev => prev.filter(m => m.tempId !== tempId));
+    });
+
+    socket.on("messageError", ({ error, tempId }) => {
+      console.error("Message error:", error);
+      setPendingMessages(prev => 
+        prev.map(m => m.tempId === tempId ? { ...m, failed: true } : m)
+      );
     });
 
     socket.on("userOnline", (data) => {
@@ -96,10 +151,20 @@ useEffect(() => {
           u.id === data.userId ? { ...u, online: true } : u
         )
       );
+      setChatUsers((prev) =>
+        prev.map((u) =>
+          u.id === data.userId ? { ...u, online: true } : u
+        )
+      );
     });
 
     socket.on("userOffline", (data) => {
       setUsers((prev) =>
+        prev.map((u) =>
+          u.id === data.userId ? { ...u, online: false } : u
+        )
+      );
+      setChatUsers((prev) =>
         prev.map((u) =>
           u.id === data.userId ? { ...u, online: false } : u
         )
@@ -140,37 +205,50 @@ useEffect(() => {
       }
     });
 
+    socket.on("unreadCounts", (counts) => {
+      setUnreadCounts(counts);
+    });
+
+    socket.on("unreadCountUpdated", ({ peerId, unreadCount }) => {
+      setUnreadCounts(prev => ({
+        ...prev,
+        [peerId]: unreadCount
+      }));
+    });
+
     socket.emit("deliverPendingMessages");
 
-    // Handle reconnection - ensure pending messages are delivered on reconnect
     socket.on("connect", () => {
       console.log("Socket connected/reconnected");
       socket.emit("deliverPendingMessages");
       socket.emit("heartbeat");
       socket.emit("getUsers");
       socket.emit("getChatUsers");
+      socket.emit("getUnreadCounts");
       
-      // Reload messages for selected user if any
       const selected = selectedUserRef.current;
       if (selected) {
         socket.emit("loadMessages", { selectedUserId: selected.id });
         socket.emit("markAsRead", { senderId: selected.id });
       }
+
+      pendingMessages.forEach(msg => {
+        if (!msg.failed) {
+          socket.emit("privateMessage", msg);
+        }
+      });
     });
 
-    // Clear any existing heartbeat interval before creating new one
     if (heartbeatIntervalRef.current) {
       clearInterval(heartbeatIntervalRef.current);
     }
 
-    // Heartbeat mechanism - send ping every 30 seconds to maintain online status
     heartbeatIntervalRef.current = setInterval(() => {
       if (socketRef.current) {
         socketRef.current.emit("heartbeat");
       }
     }, 30000);
 
-    // Send initial heartbeat
     socket.emit("heartbeat");
 
     return () => {
@@ -178,11 +256,16 @@ useEffect(() => {
       socket.off("chatUsersList");
       socket.off("chatHistory");
       socket.off("receiveMessage");
+      socket.off("receiveQueuedMessage");
+      socket.off("messageSent");
+      socket.off("messageError");
       socket.off("userOnline");
       socket.off("userOffline");
       socket.off("reactionUpdated");
       socket.off("messagesRead");
       socket.off("messagesDelivered");
+      socket.off("unreadCounts");
+      socket.off("unreadCountUpdated");
       socket.off("connect");
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
@@ -191,12 +274,16 @@ useEffect(() => {
     };
   }, [user]);
 
-  // ---------------- SELECT USER ----------------
   const handleSelectUser = (userObj) => {
     setSelectedUser(userObj);
     selectedUserRef.current = userObj;
 
     if (window.innerWidth <= 768) setMobileView(true);
+
+    setUnreadCounts(prev => ({
+      ...prev,
+      [userObj.id]: 0
+    }));
 
     if (socketRef.current) {
       socketRef.current.emit("loadMessages", { selectedUserId: userObj.id });
@@ -204,20 +291,38 @@ useEffect(() => {
     }
   };
 
-  // ---------------- SEND MESSAGE ----------------
   const addMessage = (message) => {
     if (!selectedUser || !socketRef.current) return;
 
+    const tempId = `temp_${Date.now()}_${messageIdCounter.current++}`;
+    
+    const optimisticMessage = {
+      tempId,
+      sender: user.id,
+      sender_id: user.id,
+      receiver: selectedUser.id,
+      receiver_id: selectedUser.id,
+      message,
+      senderAvatar: user.avatar,
+      sender_avatar: user.avatar,
+      timestamp: new Date().toISOString(),
+      status: 'sending',
+      reactions: {}
+    };
+
+    setChats(prev => [...prev, optimisticMessage]);
+    
     const newMessage = {
+      tempId,
       receiverId: selectedUser.id,
       message,
       senderAvatar: user.avatar,
     };
 
+    setPendingMessages(prev => [...prev, newMessage]);
     socketRef.current.emit("privateMessage", newMessage);
   };
 
-  // ---------------- REACTIONS ----------------
   const handleAddReaction = (chat, emoji) => {
     if (!socketRef.current || !chat.id) return;
     const senderId = chat.sender_id || chat.sender;
@@ -241,10 +346,9 @@ useEffect(() => {
     });
   };
 
-  // ---------------- LOGOUT ----------------
   const handleLogout = () => {
     localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+    localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
     window.location.reload();
   };
@@ -254,6 +358,8 @@ useEffect(() => {
     setSelectedUser(null);
   };
 
+  const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+
   return (
     <div className="home">
       {user ? (
@@ -261,6 +367,9 @@ useEffect(() => {
           <div className={`sidebar ${mobileView ? "hidden" : ""}`}>
             <div className="sidebar_header">
               <h3>{user.username}</h3>
+              {totalUnread > 0 && (
+                <span className="total_unread_badge">{totalUnread > 99 ? '99+' : totalUnread}</span>
+              )}
               <button className="logout_btn" onClick={handleLogout}>
                 Logout
               </button>
@@ -268,7 +377,10 @@ useEffect(() => {
 
             <UserList
               users={users}
-              chatUsers={chatUsers}
+              chatUsers={chatUsers.map(u => ({
+                ...u,
+                unreadCount: unreadCounts[u.id] || 0
+              }))}
               onSelectUser={handleSelectUser}
               selectedUser={selectedUser?.id}
               currentUser={user.id}
@@ -297,7 +409,8 @@ useEffect(() => {
                   <div className="chat_user_info">
                     <h4>{selectedUser.username}</h4>
                     <span className="user_status_text">
-                      {users.find((u) => u.id === selectedUser.id)?.online
+                      {users.find((u) => u.id === selectedUser.id)?.online ||
+                       chatUsers.find((u) => u.id === selectedUser.id)?.online
                         ? "Online"
                         : "Offline"}
                     </span>

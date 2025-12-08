@@ -16,13 +16,31 @@
 }
 
 .message_status.sent {
-  color: rgba(255, 255, 255, 0.6);
+  color: #8696a0;
 }
 
 .message_status.delivered {
-  color: rgba(255, 255, 255, 0.8);
+  color: #8696a0;
 }
 
 .message_status.read {
   color: #53bdeb;
+}
+
+.message_status.sending {
+  color: #8696a0;
+  opacity: 0.7;
+}
+
+.message_status.queued {
+  color: #f0b132;
+}
+
+.status_sending {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }

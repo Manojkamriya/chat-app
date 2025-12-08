@@ -4,6 +4,37 @@
 
 This is a real-time chat application built with a React frontend and Express backend. The application enables users to communicate in real-time through WebSocket connections, with message persistence and user presence tracking. The system uses Supabase for authentication and data storage, with Socket.IO handling real-time bidirectional communication between clients and server.
 
+## Recent Changes (December 2024)
+
+### New Features Implemented
+
+1. **Offline Message Queue System**
+   - Messages are queued when recipient is offline or has network interruption
+   - Queued messages are delivered automatically when user reconnects
+   - Message status tracking: sending → queued → delivered → read
+
+2. **Last Message Indexing**
+   - WhatsApp-style conversation list with last message preview
+   - Shows "You:" prefix for messages sent by current user
+   - Timestamps formatted relative to current time (Today, Yesterday, weekday, date)
+
+3. **Unread Message Count UI**
+   - Green badges showing unread message count per conversation
+   - Total unread count displayed in sidebar header
+   - Automatic count reset when opening a conversation
+
+4. **End-to-End Encryption Infrastructure** (Foundation Ready)
+   - ECDH key pair generation using Web Crypto API
+   - AES-GCM encryption for message content
+   - Key backup/restore with passphrase protection (PBKDF2)
+   - Local key storage with session key caching
+   - Note: Requires database schema updates (public_key, ciphertext, iv columns) to fully activate
+
+5. **MessagePack Binary Serialization** (Utilities Ready)
+   - Compression utilities for reduced payload size
+   - Message packing/unpacking helpers
+   - Note: Can be activated by wrapping socket.emit calls with pack/unpack
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -19,11 +50,16 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: React hooks for local state management
 - **Real-time Communication**: Socket.IO client for WebSocket connections
 
-**Key Design Decisions**:
-- Single Page Application (SPA) architecture for smooth user experience
-- Component-based structure for reusability and maintainability
-- CSS animations for enhanced user interactions (emoji picker, message status)
-- Responsive design principles with mobile-first considerations
+**Key Components**:
+- `ChatContainer.jsx` - Main chat application container with socket management
+- `ChatLists.jsx` - Message display with date grouping and status indicators
+- `UserList.jsx` - Conversation list with unread badges and last message preview
+- `InputText.jsx` - Message input with keyboard handling
+
+**Utilities**:
+- `utils/crypto.js` - End-to-end encryption utilities (ECDH, AES-GCM)
+- `utils/messagepack.js` - Binary serialization for reduced payload
+- `hooks/useCrypto.js` - React hook for encryption management
 
 ### Backend Architecture
 
@@ -33,37 +69,35 @@ Preferred communication style: Simple, everyday language.
 - **Real-time Layer**: Socket.IO server for WebSocket management and event handling
 - **Process Management**: Nodemon for development auto-reload
 
-**Key Design Decisions**:
-- Separation of concerns with dedicated route handlers and socket logic
-- CORS enabled for cross-origin requests with credentials support
-- Dual-transport strategy (WebSocket and polling) for broad client compatibility
-- Heartbeat mechanism (60-second timeout) to track user presence and clean up stale connections
-- Centralized socket event handling in dedicated module
+**Socket Events**:
+- `privateMessage` / `sendEncryptedMessage` - Send messages (with optional E2E encryption)
+- `deliverPendingMessages` - Deliver queued messages on reconnect
+- `markAsRead` - Mark messages as read and update status
+- `getChatUsers` - Get conversation list with unread counts
+- `registerPublicKey` / `requestPublicKey` - E2E encryption key exchange
+- `saveKeyBackup` / `getKeyBackup` - Encryption key backup management
 
 **Connection Management**:
 - Automatic offline detection through heartbeat checking (30-second intervals)
-- Graceful handling of stale connections with socket cleanup
+- Message queue for offline recipients with automatic delivery
 - Real-time user status broadcasting to all connected clients
 
 ### Data Storage
 
 **Primary Database**: Supabase (PostgreSQL-based)
 - **Rationale**: Provides integrated authentication, real-time subscriptions, and PostgreSQL database with RESTful API
-- **Schema Design**:
-  - `profiles` table: User information (id, username, avatar, online status, last_seen, socket_id)
-  - Message storage handled through Supabase tables
-- **Authentication**: Supabase Auth for user management with JWT tokens
-- **Advantages**: Real-time capabilities, built-in auth, auto-generated REST API, PostgreSQL reliability
 
-**Legacy/Alternative**: MongoDB with Mongoose ODM
-- **Status**: Configuration present but appears to be transitioning to Supabase
-- **Models**: User and Chat schemas defined with Mongoose
-- **Note**: Environment variable `MONGODB_URI` suggests MongoDB was originally used but system is migrating to Supabase
+**Tables**:
+- `profiles` - User information (id, username, avatar, online, last_seen, socket_id, public_key, encryption_version)
+- `chats` - Messages (sender_id, receiver_id, message, status, ciphertext, iv, is_encrypted, queued_at, delivered_at, read_at)
+- `key_backups` - Encrypted E2E keys (user_id, public_key, encrypted_key, salt, iv)
 
-**Design Rationale**:
-- Supabase chosen for its integrated authentication and real-time features
-- Reduces backend complexity by leveraging managed services
-- PostgreSQL provides ACID compliance for critical chat data
+**Message Status Flow**:
+```
+sending → queued (if offline) → delivered → read
+                ↓
+              sent (if online)
+```
 
 ### Authentication & Authorization
 
@@ -71,12 +105,6 @@ Preferred communication style: Simple, everyday language.
 - **Method**: Email/password authentication with JWT tokens
 - **Token Management**: Access tokens provided on signup/login for subsequent API requests
 - **Session Handling**: Credentials-based CORS for secure cross-origin authentication
-- **User Profiles**: Automatic profile creation on signup linking to auth.users
-
-**Security Considerations**:
-- JWT tokens for stateless authentication
-- Environment-based secrets (SUPABASE_URL, SUPABASE_ANON_KEY)
-- CORS configuration restricts unauthorized origins
 
 ## External Dependencies
 
@@ -84,50 +112,45 @@ Preferred communication style: Simple, everyday language.
 
 **Supabase** (Primary Backend Service)
 - **Purpose**: Authentication, PostgreSQL database, real-time subscriptions
-- **Configuration**: Requires `SUPABASE_URL` and `SUPABASE_ANON_KEY` environment variables
+- **Configuration**: Requires `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` environment variables
 - **Integration**: `@supabase/supabase-js` client library
-- **Usage**: User authentication, profile storage, message persistence, real-time updates
-
-**MongoDB** (Legacy/Optional)
-- **Purpose**: Alternative database (transitioning away)
-- **Configuration**: `MONGODB_URI` environment variable
-- **Integration**: Mongoose ODM for schema management
-- **Status**: Present in codebase but Supabase appears to be primary data store
 
 ### Key NPM Packages
 
 **Backend**:
-- `socket.io`: Real-time WebSocket server for bidirectional communication
+- `socket.io`: Real-time WebSocket server
 - `express`: Web framework for REST API routes
 - `cors`: Cross-Origin Resource Sharing middleware
-- `jsonwebtoken`: JWT token handling
-- `mongoose`: MongoDB ODM (legacy)
 - `@supabase/supabase-js`: Supabase client library
-- `axios`: HTTP client for external API calls
+- `@msgpack/msgpack`: Binary serialization
 - `dotenv`: Environment variable management
 
 **Frontend**:
-- `socket.io-client`: WebSocket client for server communication
+- `socket.io-client`: WebSocket client
 - `react` & `react-dom`: UI framework
-- `react-icons`: Icon library for UI elements
-- `lodash`: Utility library for data manipulation
+- `react-icons`: Icon library
+- `@msgpack/msgpack`: Binary serialization
 - `vite`: Build tool and development server
-
-**Development**:
-- `concurrently`: Run frontend and backend simultaneously in development
-- `nodemon`: Auto-restart backend on file changes
-- ESLint plugins for React code quality
 
 ### Environment Configuration
 
 **Required Environment Variables**:
-- Backend: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `PORT` (optional, defaults to 3001), `MONGODB_URI` (legacy)
-- Frontend: Configured to connect to backend via Vite proxy or direct connection
+- `SUPABASE_URL`: Supabase project URL
+- `SUPABASE_ANON_KEY`: Supabase anonymous key
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key (for admin operations)
+- `PORT`: Backend port (defaults to 3001)
+- `VITE_API_URL`: Frontend API URL for backend connection
 
-### Deployment Considerations
+### Running the Application
 
-- **Vercel Build**: Custom build script for Vercel deployment (`vercel-build`)
-- **Static Assets**: Client built to static files for CDN deployment
-- **Server Hosting**: Backend requires Node.js runtime environment
-- **Port Configuration**: Backend defaults to port 3001, frontend dev server on port 5000
-- **Host Binding**: Server binds to localhost (may need adjustment for production)
+**Development**:
+```bash
+npm install
+cd client && npm install
+cd ../server && npm install
+npm run dev
+```
+
+**Port Configuration**:
+- Backend: Port 3001
+- Frontend: Port 5000 (exposed externally)

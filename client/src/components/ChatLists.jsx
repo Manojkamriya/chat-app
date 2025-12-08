@@ -9,21 +9,48 @@ const LONG_PRESS_DURATION = 600; // ms
 const MessageStatus = ({ status, isSender }) => {
   if (!isSender) return null;
   
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'read':
+        return (
+          <svg viewBox="0 0 16 11" width="16" height="11" className="status_read">
+            <path fill="currentColor" d="M11.07 0.15L5.43 5.89L3.93 4.39L1.03 7.29L5.43 11.69L13.97 3.05L11.07 0.15ZM11.07 0.15L14.97 4.05L12.07 6.95" />
+          </svg>
+        );
+      case 'delivered':
+        return (
+          <svg viewBox="0 0 16 11" width="16" height="11" className="status_delivered">
+            <path fill="currentColor" d="M11.07 0.15L5.43 5.89L3.93 4.39L1.03 7.29L5.43 11.69L13.97 3.05L11.07 0.15ZM11.07 0.15L14.97 4.05L12.07 6.95" />
+          </svg>
+        );
+      case 'sending':
+        return (
+          <svg viewBox="0 0 12 12" width="12" height="12" className="status_sending">
+            <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="20" strokeDashoffset="10">
+              <animate attributeName="stroke-dashoffset" values="0;31.4" dur="1s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+        );
+      case 'queued':
+        return (
+          <svg viewBox="0 0 12 11" width="12" height="11" className="status_queued">
+            <circle cx="6" cy="5.5" r="4" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1" fill="none"/>
+          </svg>
+        );
+      case 'sent':
+      default:
+        return (
+          <svg viewBox="0 0 12 11" width="12" height="11" className="status_sent">
+            <path fill="currentColor" d="M9.07 0.15L3.43 5.89L1.93 4.39L0.03 6.29L3.43 9.69L10.97 2.05L9.07 0.15Z" />
+          </svg>
+        );
+    }
+  };
+  
   return (
     <span className={`message_status ${status || 'sent'}`}>
-      {status === 'read' ? (
-        <svg viewBox="0 0 16 11" width="16" height="11">
-          <path fill="currentColor" d="M11.07 0.15L5.43 5.89L3.93 4.39L1.03 7.29L5.43 11.69L13.97 3.05L11.07 0.15ZM11.07 0.15L14.97 4.05L12.07 6.95" />
-        </svg>
-      ) : status === 'delivered' ? (
-        <svg viewBox="0 0 16 11" width="16" height="11">
-          <path fill="currentColor" d="M11.07 0.15L5.43 5.89L3.93 4.39L1.03 7.29L5.43 11.69L13.97 3.05L11.07 0.15ZM11.07 0.15L14.97 4.05L12.07 6.95" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 12 11" width="12" height="11">
-          <path fill="currentColor" d="M9.07 0.15L3.43 5.89L1.93 4.39L0.03 6.29L3.43 9.69L10.97 2.05L9.07 0.15Z" />
-        </svg>
-      )}
+      {getStatusIcon()}
     </span>
   );
 };
